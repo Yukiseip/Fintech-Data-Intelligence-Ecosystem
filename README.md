@@ -10,6 +10,17 @@
 
 ---
 
+### 📸 Project Demo
+
+| | | |
+|:---:|:---:|:---:|
+| ![Demo 1](./demo1.png) | ![Demo 2](./demo2.png) | ![Demo 3](./demo3.png) |
+| **Step 1: Analysis** | **Step 2: Processing** | **Step 3: Integration** |
+| ![Demo 4](./demo4.png) | ![Demo 5](./demo5.png) | ![Demo 6](./demo6.png) |
+| **Step 4: Logic** | **Step 5: Storage** | **Step 6: Results** |
+
+---
+
 ## 📖 ¿Qué problema resuelve este proyecto?
 
 En el sector financiero y Fintech moderno, las empresas procesan miles de transacciones por minuto. Esto genera desafíos críticos:
