@@ -1,0 +1,33 @@
+volumes:
+  users: 10000
+  merchants: 5000
+  transactions_per_hour: 10000
+  disputes_rate: 0.005
+
+fraud:
+  injection_rate: 0.02
+  patterns:
+    velocity_attack:
+      enabled: true
+      min_txns: 10
+      max_txns: 15
+      window_seconds: 60
+      affected_users_pct: 0.001
+    high_amount:
+      enabled: true
+      multiplier_min: 5.0
+      multiplier_max: 10.0
+    geographic_impossible:
+      enabled: true
+      max_time_hours: 0.5
+
+output:
+  format: jsonl
+  batch_size: 1000
+  s3_bucket: fintech-raw-data
+  success_marker: _SUCCESS
+
+currencies: [USD, EUR, GBP, JPY, CAD, MXN]
+transaction_types: [purchase, refund, transfer, withdrawal]
+statuses: [completed, pending, failed, disputed]
+payment_methods: [card, bank_transfer, wallet, crypto]

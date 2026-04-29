@@ -1,0 +1,24 @@
+# ─── Dev overrides: extra ports, volume mounts for hot-reload ─────────
+
+services:
+  # Mount processing source for hot-reload during development
+  processing:
+    volumes:
+      - ./processing:/app
+    profiles: []  # Remove profile so it starts with `make up` in dev
+
+  # Mount data_generator for hot-reload
+  data-generator:
+    volumes:
+      - ./data_generator:/app
+    profiles: []  # Available without --profile generate in dev
+
+  # Extra Spark worker for dev (optional)
+  spark-worker:
+    deploy:
+      replicas: 2
+
+  # Extra Airflow worker replica
+  airflow-worker:
+    deploy:
+      replicas: 2

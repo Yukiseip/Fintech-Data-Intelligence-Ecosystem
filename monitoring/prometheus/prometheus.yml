@@ -1,0 +1,57 @@
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+  external_labels:
+    project: 'fintech-analytics'
+    environment: 'local'
+
+# Alerting config (optional: add Alertmanager when in production)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets: ['alertmanager:9093']
+
+# Load alert rules
+rule_files:
+  - "/etc/prometheus/rules/*.yml"
+
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    metrics_path: '/metrics'
+
+  # Airflow metrics
+  # - job_name: 'airflow'
+  #   static_configs:
+  #     - targets: ['airflow-webserver:8080']
+  #   metrics_path: '/metrics'
+  #   scrape_timeout: 10s
+
+  # Spark Master Web UI
+  # - job_name: 'spark-master'
+  #   static_configs:
+  #     - targets: ['spark-master:8081']
+  #   metrics_path: '/metrics/prometheus'
+  #   scrape_timeout: 10s
+
+  # Spark Workers
+  # - job_name: 'spark-worker'
+  #   static_configs:
+  #     - targets: ['spark-worker:8082']
+  #   metrics_path: '/metrics/prometheus'
+  #   scrape_timeout: 10s
+
+  # PostgreSQL exporter (exposes pg_stat_statements)
+  # - job_name: 'postgres'
+  #   static_configs:
+  #     - targets: ['postgres-exporter:9187']
+  #   metrics_path: '/metrics'
+
+  # LocalStack
+  # - job_name: 'localstack'
+  #   static_configs:
+  #     - targets: ['localstack:4566']
+  #   metrics_path: '/_localstack/health'
+  #   scrape_timeout: 10s

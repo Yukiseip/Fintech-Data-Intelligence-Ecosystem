@@ -1,0 +1,43 @@
+version: 2
+
+models:
+  - name: stg_transactions
+    description: "Cleaned transactions from staging, ready for Gold modeling"
+    tests:
+      - dbt_utils.expression_is_true:
+          expression: "amount > 0"
+    columns:
+      - name: transaction_id
+        tests: [not_null, unique]
+      - name: user_id
+        tests: [not_null]
+      - name: merchant_id
+        tests: [not_null]
+      - name: amount
+        tests:
+          - not_null
+      - name: currency
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['USD', 'EUR', 'GBP', 'JPY', 'CAD', 'MXN']
+      - name: status
+        tests:
+          - accepted_values:
+              values: ['completed', 'pending', 'failed', 'disputed']
+      - name: transaction_type
+        tests:
+          - accepted_values:
+              values: ['purchase', 'refund', 'transfer', 'withdrawal']
+
+  - name: stg_users
+    description: "Deduped users from staging"
+    columns:
+      - name: user_id
+        tests: [not_null, unique]
+
+  - name: stg_merchants
+    description: "Deduped merchants from staging"
+    columns:
+      - name: merchant_id
+        tests: [not_null, unique]

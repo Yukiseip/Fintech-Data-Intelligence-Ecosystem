@@ -1,0 +1,50 @@
+groups:
+  - name: fintech-pipeline-alerts
+    rules:
+
+      # ── SLA: Ingest Volume ─────────────────────────────────────────
+      - alert: LowIngestVolume
+        expr: |
+          (
+            SELECT COUNT(*) FROM gold.fact_transactions
+            WHERE created_at >= NOW() - INTERVAL '1 hour'
+          ) < 100
+        for: 10m
+        labels:
+          severity: warning
+          team: data-engineering
+        annotations:
+          summary: "Low ingest volume in last hour"
+          description: "Fewer than 100 transactions ingested in the last hour. Bronze job may have failed."
+
+      # ── SLA: Fraud Rate Spike ──────────────────────────────────────
+      - alert: FraudRateSpike
+        expr: |
+          (
+            SELECT ROUND(100.0 * COUNT(*) FILTER (WHERE is_flagged_fraud) / NULLIF(COUNT(*), 0), 2)
+            FROM gold.fact_transactions
+            WHERE created_at >= NOW() - INTERVAL '1 hour'
+          ) > 10
+        for: 5m
+        labels:
+          severity: critical
+          team: risk
+        annotations:
+          summary: "Fraud rate spike detected"
+          description: "Fraud rate exceeded 10% in the last hour. Immediate investigation required."
+
+      # ── SLA: Open Alerts Backlog ───────────────────────────────────
+      - alert: OpenAlertsBacklog
+        expr: |
+          (
+            SELECT COUNT(*) FROM gold.alerts_log
+            WHERE status = 'open'
+            AND alert_timestamp < NOW() - INTERVAL '24 hours'
+          ) > 50
+        for: 30m
+        labels:
+          severity: warning
+          team: risk
+        annotations:
+          summary: "High open alerts backlog"
+          description: "More than 50 alerts have been open for over 24 hours without investigation."

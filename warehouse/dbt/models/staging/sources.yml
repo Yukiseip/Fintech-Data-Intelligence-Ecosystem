@@ -1,0 +1,32 @@
+version: 2
+
+sources:
+  - name: staging
+    schema: staging
+    description: "Raw staging tables written by Spark jobs"
+    tables:
+      - name: fact_transactions_staging
+        description: "Raw transactions from Spark Gold job"
+        tests:
+          - dbt_utils.expression_is_true:
+              expression: "amount > 0"
+        columns:
+          - name: transaction_id
+            tests: [not_null]
+          - name: user_id
+            tests: [not_null]
+          - name: amount
+            tests:
+              - not_null
+
+      - name: dim_users_staging
+        description: "Raw users from Spark Gold job"
+        columns:
+          - name: user_id
+            tests: [not_null]
+
+      - name: dim_merchants_staging
+        description: "Raw merchants from Spark Gold job"
+        columns:
+          - name: merchant_id
+            tests: [not_null]

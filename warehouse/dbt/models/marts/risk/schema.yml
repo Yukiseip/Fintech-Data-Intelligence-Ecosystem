@@ -1,0 +1,29 @@
+version: 2
+
+models:
+  - name: mart_fraud_summary
+    description: "Daily fraud alert summary by rule, country, and severity for BI"
+    tests:
+      - dbt_utils.expression_is_true:
+          expression: "alert_count >= 0"
+    columns:
+      - name: alert_date
+        tests: [not_null]
+      - name: reason_code
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['VELOCITY_ATTACK', 'HIGH_AMOUNT', 'GEO_IMPOSSIBLE', 'ML_ANOMALY']
+      - name: alert_count
+        tests:
+          - not_null
+
+  - name: mart_executive_kpis
+    description: "Daily executive KPIs: TPV, fraud rate, transaction counts"
+    tests:
+      - dbt_utils.expression_is_true:
+          expression: "fraud_rate_pct >= 0 AND fraud_rate_pct <= 100"
+    columns:
+      - name: txn_date
+        tests: [not_null, unique]
+      - name: fraud_rate_pct

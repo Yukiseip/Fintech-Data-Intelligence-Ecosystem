@@ -1,0 +1,356 @@
+# ══════════════════════════════════════════════════════════════════════
+#  Airflow common anchor — DRY configuration shared by all AF services
+# ══════════════════════════════════════════════════════════════════════
+x-airflow-common: &airflow-common
+  build:
+    context: ./orchestration
+    dockerfile: Dockerfile
+  environment: &airflow-env
+    AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/airflow
+    AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/airflow
+    AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
+    AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+    AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY:-changeme_please_generate}
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'false'
+    AIRFLOW__WEBSERVER__RBAC: 'true'
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
+    # LocalStack / AWS (test creds for local only)
+    AWS_ACCESS_KEY_ID: test
+    AWS_SECRET_ACCESS_KEY: test
+    AWS_DEFAULT_REGION: us-east-1
+    LOCALSTACK_ENDPOINT: ${LOCALSTACK_ENDPOINT:-http://localstack:4566}
+    S3_BUCKET: ${S3_BUCKET:-fintech-raw-data}
+    SPARK_MASTER_URL: ${SPARK_MASTER_URL:-spark://spark-master:7077}
+    SPARK_EXECUTOR_MEMORY: ${SPARK_EXECUTOR_MEMORY:-2g}
+    SPARK_EXECUTOR_CORES: ${SPARK_EXECUTOR_CORES:-2}
+    POSTGRES_HOST: postgres
+    POSTGRES_PORT: "5432"
+    POSTGRES_DB: ${POSTGRES_DB}
+    POSTGRES_USER: ${POSTGRES_USER}
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  volumes:
+    - ./orchestration/dags:/opt/airflow/dags
+    - ./orchestration/config:/opt/airflow/config:ro
+    - ./orchestration/config/airflow.cfg:/opt/airflow/airflow.cfg:ro
+    - ./data_generator:/opt/airflow/data_generator:ro
+    - ./processing/jobs:/opt/spark/jobs:ro
+    - ./processing:/opt/spark/processing:ro
+    - ./warehouse/dbt:/opt/dbt:ro
+    - airflow-logs:/opt/airflow/logs
+    - airflow-plugins:/opt/airflow/plugins
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  restart: unless-stopped
+
+# ══════════════════════════════════════════════════════════════════════
+#  Services
+# ══════════════════════════════════════════════════════════════════════
+services:
+
+  # ── PostgreSQL 16 (DWH + Airflow metadata) ───────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: fintech-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./warehouse/init-scripts:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  # ── Redis 7 (Celery broker) ───────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: fintech-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # ── LocalStack (S3 mock) ──────────────────────────────────────────
+  localstack:
+    image: localstack/localstack:3.0
+    container_name: fintech-localstack
+    ports:
+      - "4566:4566"
+    environment:
+      SERVICES: s3,iam
+      DEFAULT_REGION: us-east-1
+      DATA_DIR: /var/lib/localstack
+      DEBUG: 0
+    volumes:
+      - localstack-data:/var/lib/localstack
+      - ./infrastructure/scripts:/scripts:ro
+      - ./infrastructure/terraform:/infrastructure/terraform:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+  # ── Terraform runner (profile: infra) ────────────────────────────
+  # One-shot container that runs Terraform against LocalStack.
+  # Usage: docker compose run --rm terraform  (or via `make infra`)
+  terraform:
+    image: hashicorp/terraform:1.7
+    container_name: fintech-terraform
+    working_dir: /infrastructure/terraform
+    entrypoint: ["/bin/sh", "/scripts/init-localstack.sh"]
+    environment:
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: us-east-1
+    volumes:
+      - ./infrastructure/terraform:/infrastructure/terraform
+      - ./infrastructure/scripts:/scripts:ro
+    depends_on:
+      localstack:
+        condition: service_healthy
+    profiles:
+      - infra
+    restart: "no"
+
+  # ── Airflow Init (runs once) ──────────────────────────────────────
+  airflow-init:
+    <<: *airflow-common
+    container_name: fintech-airflow-init
+    command: >
+      bash -c "
+        airflow db migrate &&
+        airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@fintech.local ||
+        echo 'User already exists' &&
+        python /opt/airflow/config/create_connections.py ||
+        echo 'Connections may already exist'
+      "
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── Airflow Webserver ─────────────────────────────────────────────
+  airflow-webserver:
+    <<: *airflow-common
+    container_name: fintech-airflow-webserver
+    command: webserver
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── Airflow Scheduler ─────────────────────────────────────────────
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: fintech-airflow-scheduler
+    command: scheduler
+    healthcheck:
+      test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob --hostname $(hostname)"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # ── Airflow Celery Worker (2 replicas via override) ───────────────
+  airflow-worker:
+    <<: *airflow-common
+    command: celery worker
+    environment:
+      <<: *airflow-env
+      DUMB_INIT_SETSID: "0"
+
+  # ── Spark Master ──────────────────────────────────────────────────
+  spark-master:
+    image: public.ecr.aws/bitnami/spark:3.5
+    container_name: fintech-spark-master
+    environment:
+      SPARK_MODE: master
+      SPARK_MASTER_WEBUI_PORT: 8081
+      SPARK_RPC_AUTHENTICATION_ENABLED: "no"
+      SPARK_RPC_ENCRYPTION_ENABLED: "no"
+      SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED: "no"
+      SPARK_SSL_ENABLED: "no"
+    ports:
+      - "8081:8081"
+      - "7077:7077"
+    volumes:
+      - ./processing/jobs:/opt/spark/jobs:ro
+      - ./processing:/opt/spark/processing:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/json"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  # ── Spark Worker ──────────────────────────────────────────────────
+  spark-worker:
+    image: public.ecr.aws/bitnami/spark:3.5
+    environment:
+      SPARK_MODE: worker
+      SPARK_MASTER_URL: spark://spark-master:7077
+      SPARK_WORKER_MEMORY: ${SPARK_EXECUTOR_MEMORY:-2G}
+      SPARK_WORKER_CORES: ${SPARK_EXECUTOR_CORES:-2}
+      SPARK_RPC_AUTHENTICATION_ENABLED: "no"
+      SPARK_RPC_ENCRYPTION_ENABLED: "no"
+    volumes:
+      - ./processing/jobs:/opt/spark/jobs:ro
+      - ./processing:/opt/spark/processing:ro
+    depends_on:
+      spark-master:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── Data Generator (profile: generate) ───────────────────────────
+  data-generator:
+    build:
+      context: ./data_generator
+      dockerfile: Dockerfile
+    container_name: fintech-data-generator
+    environment:
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: us-east-1
+      LOCALSTACK_ENDPOINT: ${LOCALSTACK_ENDPOINT:-http://localstack:4566}
+      S3_BUCKET: ${S3_BUCKET:-fintech-raw-data}
+      GENERATOR_BATCH_SIZE: ${GENERATOR_BATCH_SIZE:-1000}
+      GENERATOR_FRAUD_RATE: ${GENERATOR_FRAUD_RATE:-0.02}
+    depends_on:
+      localstack:
+        condition: service_healthy
+    profiles:
+      - generate
+
+  # ── Processing (Spark jobs container) ────────────────────────────
+  processing:
+    build:
+      context: ./processing
+      dockerfile: Dockerfile
+    container_name: fintech-processing
+    environment:
+      SPARK_MASTER_URL: ${SPARK_MASTER_URL:-spark://spark-master:7077}
+      LOCALSTACK_ENDPOINT: ${LOCALSTACK_ENDPOINT:-http://localstack:4566}
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: us-east-1
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      S3_BUCKET: ${S3_BUCKET:-fintech-raw-data}
+    depends_on:
+      spark-master:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    profiles:
+      - processing
+
+  # ── Streamlit Dashboard ───────────────────────────────────────────
+  streamlit:
+    build:
+      context: ./analytics
+      dockerfile: Dockerfile
+    container_name: fintech-streamlit
+    ports:
+      - "8501:8501"
+    environment:
+      STREAMLIT_DB_CONNECTION: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      STREAMLIT_SERVER_PORT: "8501"
+      STREAMLIT_SERVER_HEADLESS: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── Prometheus ────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: fintech-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=7d'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+
+  # ── Grafana ───────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:latest
+    container_name: fintech-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_PATHS_PROVISIONING: /etc/grafana/provisioning
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+  # ── Jupyter (dev profile only) ────────────────────────────────────
+  jupyter:
+    image: jupyter/pyspark-notebook:spark-3.5.0
+    container_name: fintech-jupyter
+    ports:
+      - "8888:8888"
+    environment:
+      JUPYTER_ENABLE_LAB: "yes"
+    volumes:
+      - ./notebooks:/home/jovyan/work
+    profiles:
+      - dev
+
+# ══════════════════════════════════════════════════════════════════════
+#  Named volumes
+# ══════════════════════════════════════════════════════════════════════
+volumes:
+  postgres-data:
+  localstack-data:
+  airflow-logs:
+  airflow-plugins:
+  grafana-data:
+  prometheus-data:

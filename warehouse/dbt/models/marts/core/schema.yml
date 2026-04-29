@@ -1,0 +1,41 @@
+version: 2
+
+models:
+  - name: fct_transactions
+    description: "Central fact table: one row per transaction in Gold star schema"
+    tests:
+      - dbt_utils.expression_is_true:
+          expression: "amount > 0"
+      - dbt_utils.expression_is_true:
+          expression: "fraud_score >= 0 AND fraud_score <= 1"
+    columns:
+      - name: transaction_id
+        tests: [not_null, unique]
+      - name: user_sk
+        tests: [not_null]
+      - name: merchant_sk
+        tests: [not_null]
+      - name: time_sk
+        tests: [not_null]
+      - name: amount
+        tests:
+          - not_null
+      - name: fraud_score
+
+  - name: dim_users
+    description: "User dimension with current SCD2 records"
+    columns:
+      - name: user_sk
+        tests: [not_null, unique]
+      - name: user_id
+        tests: [not_null, unique]
+      - name: risk_tier
+        tests:
+          - accepted_values:
+              values: ['low', 'medium', 'high']
+
+  - name: dim_merchants
+    description: "Merchant dimension"
+    columns:
+      - name: merchant_id
+        tests: [not_null]

@@ -1,0 +1,17 @@
+# Orchestration (Airflow) requirements
+apache-airflow==2.9.0
+apache-airflow-providers-apache-spark==4.7.1
+apache-airflow-providers-amazon==8.19.0
+apache-airflow-providers-postgres==5.10.2
+apache-airflow-providers-redis==3.6.1
+celery[redis]==5.3.6
+psycopg2-binary==2.9.9
+boto3==1.34.69
+pytest==8.1.1
+faker==24.3.0
+pydantic==1.10.14
+pyyaml==6.0.1
+dbt-core==1.7.9
+dbt-postgres==1.7.9
+great-expectations==0.18.12
+pyspark==3.5.6

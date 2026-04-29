@@ -1,0 +1,19 @@
+# gold_raw source definitions for dbt models that read from existing Gold tables.
+
+version: 2
+
+sources:
+  - name: gold_raw
+    schema: gold
+    description: "Direct access to Gold layer tables (read-only in dbt models)"
+    tables:
+      - name: fact_transactions
+        description: "Central fact table"
+      - name: dim_users
+        description: "User dimension with SCD2"
+      - name: dim_merchants
+        description: "Merchant dimension"
+      - name: dim_time
+        description: "Pre-populated calendar table (2020-2030)"
+      - name: alerts_log
+        description: "Fraud and anomaly alerts"

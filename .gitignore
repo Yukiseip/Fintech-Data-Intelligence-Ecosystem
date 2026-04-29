@@ -1,0 +1,66 @@
+# ─── Secrets (NEVER commit) ───────────────────────────────────────────
+.env
+
+# ─── Python ───────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+.installed.cfg
+*.egg-info
+MANIFEST
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ─── dbt ──────────────────────────────────────────────────────────────
+target/
+dbt_packages/
+logs/
+*.dbt.log
+
+# ─── Spark ────────────────────────────────────────────────────────────
+*.jar
+metastore_db/
+derby.log
+spark-warehouse/
+
+# ─── Docker ───────────────────────────────────────────────────────────
+.docker/
+
+# ─── Terraform ────────────────────────────────────────────────────────
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.backup
+*.tfplan
+
+# ─── Jupyter ──────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# ─── IDE ──────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ─── Great Expectations ───────────────────────────────────────────────
+great_expectations/uncommitted/

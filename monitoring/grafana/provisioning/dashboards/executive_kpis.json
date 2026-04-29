@@ -1,0 +1,248 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_POSTGRESQL",
+      "label": "PostgreSQL-Fintech",
+      "description": "",
+      "type": "datasource",
+      "pluginId": "postgres",
+      "pluginName": "PostgreSQL"
+    }
+  ],
+  "__requires": [
+    {
+      "type": "datasource",
+      "id": "postgres",
+      "name": "PostgreSQL",
+      "version": "1.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "gauge",
+      "name": "Gauge",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "stat",
+      "name": "Stat",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "timeseries",
+      "name": "Time series",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "barchart",
+      "name": "Bar chart",
+      "version": ""
+    }
+  ],
+  "annotations": {
+    "list": []
+  },
+  "description": "Fintech pipeline executive KPIs: TPV, fraud rate, transaction volume",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": { "type": "postgres", "uid": "postgres-fintech" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red",   "value": 80 }
+            ]
+          },
+          "unit": "currencyUSD"
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "id": 1,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "title": "Total Payment Volume (30d)",
+      "type": "stat",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgres-fintech" },
+          "rawSql": "SELECT SUM(daily_tpv) AS value FROM gold.mart_executive_kpis WHERE txn_date >= NOW() - INTERVAL '30 days'",
+          "refId": "A",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "postgres-fintech" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 2 },
+              { "color": "red",    "value": 5 }
+            ]
+          },
+          "unit": "percent"
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "id": 2,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "title": "Fraud Rate % (30d avg)",
+      "type": "stat",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgres-fintech" },
+          "rawSql": "SELECT AVG(fraud_rate_pct) AS value FROM gold.mart_executive_kpis WHERE txn_date >= NOW() - INTERVAL '30 days'",
+          "refId": "A",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "postgres-fintech" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "id": 3,
+      "title": "Total Transactions (30d)",
+      "type": "stat",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgres-fintech" },
+          "rawSql": "SELECT SUM(total_transactions) AS value FROM gold.mart_executive_kpis WHERE txn_date >= NOW() - INTERVAL '30 days'",
+          "refId": "A",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "postgres-fintech" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red",    "value": 20 }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "id": 4,
+      "title": "Open Fraud Alerts",
+      "type": "stat",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgres-fintech" },
+          "rawSql": "SELECT COUNT(*) AS value FROM gold.alerts_log WHERE status = 'open'",
+          "refId": "A",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "postgres-fintech" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "currencyUSD"
+        }
+      },
+      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 4 },
+      "id": 5,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "title": "Daily TPV (30 Days)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgres-fintech" },
+          "rawSql": "SELECT txn_date AS time, daily_tpv AS value FROM gold.mart_executive_kpis WHERE txn_date >= NOW() - INTERVAL '30 days' ORDER BY txn_date",
+          "refId": "A",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "postgres-fintech" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 4 },
+      "id": 6,
+      "title": "Alerts by Rule Type",
+      "type": "barchart",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgres-fintech" },
+          "rawSql": "SELECT reason_code AS reason, COUNT(*) AS alerts FROM gold.alerts_log WHERE alert_timestamp >= NOW() - INTERVAL '30 days' GROUP BY reason_code ORDER BY alerts DESC",
+          "refId": "A",
+          "format": "table"
+        }
+      ]
+    }
+  ],
+  "refresh": "5m",
+  "schemaVersion": 38,
+  "tags": ["fintech", "executive", "kpis"],
+  "time": { "from": "now-30d", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Fintech Executive KPIs",
+  "uid": "fintech-exec-kpis",
+  "version": 1
+}
